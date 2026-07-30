@@ -128,7 +128,7 @@ shipped the proprietary Nvidia CUDA driver stack on Horizon OS, and GPU compute 
 from-scratch Vulkan/deko3d compute backend for ggml — out of scope for now).
 
 Expect roughly 1–3 tokens/second depending on model size and quantization. This is a fun toy, not a
-production inference stack.
+production inference stack. Even tho it is quite powerful!
 
 ## Known limitations
 
