@@ -1,0 +1,242 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3df1d82db..1aea33700 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -210,7 +210,7 @@ add_subdirectory(src)
+ 
+ if (LLAMA_BUILD_COMMON)
+     add_subdirectory(common)
+-    add_subdirectory(vendor/cpp-httplib)
++#    add_subdirectory(vendor/cpp-httplib)
+ endif()
+ 
+ if (LLAMA_BUILD_COMMON AND LLAMA_BUILD_TESTS AND NOT CMAKE_JS_VERSION)
+diff --git a/ggml/src/ggml-backend-dl.cpp b/ggml/src/ggml-backend-dl.cpp
+index a65cf0090..df2121d66 100644
+--- a/ggml/src/ggml-backend-dl.cpp
++++ b/ggml/src/ggml-backend-dl.cpp
+@@ -4,45 +4,64 @@
+ 
+ dl_handle * dl_load_library(const fs::path & path) {
+     // suppress error dialogs for missing DLLs
+-    DWORD old_mode = SetErrorMode(SEM_FAILCRITICALERRORS);
+-    SetErrorMode(old_mode | SEM_FAILCRITICALERRORS);
++        DWORD old_mode = SetErrorMode(SEM_FAILCRITICALERRORS);
++            SetErrorMode(old_mode | SEM_FAILCRITICALERRORS);
+ 
+-    HMODULE handle = LoadLibraryW(path.wstring().c_str());
++                HMODULE handle = LoadLibraryW(path.wstring().c_str());
+ 
+-    SetErrorMode(old_mode);
++                    SetErrorMode(old_mode);
+ 
+-    return handle;
+-}
++                        return handle;
++                        }
+ 
+-void * dl_get_sym(dl_handle * handle, const char * name) {
+-    DWORD old_mode = SetErrorMode(SEM_FAILCRITICALERRORS);
+-    SetErrorMode(old_mode | SEM_FAILCRITICALERRORS);
++                        void * dl_get_sym(dl_handle * handle, const char * name) {
++                            DWORD old_mode = SetErrorMode(SEM_FAILCRITICALERRORS);
++                                SetErrorMode(old_mode | SEM_FAILCRITICALERRORS);
+ 
+-    void * p = (void *) GetProcAddress(handle, name);
++                                    void * p = (void *) GetProcAddress(handle, name);
+ 
+-    SetErrorMode(old_mode);
++                                        SetErrorMode(old_mode);
+ 
+-    return p;
+-}
++                                            return p;
++                                            }
+ 
+-const char * dl_error() {
+-    return "";
+-}
++                                            const char * dl_error() {
++                                                return "";
++                                                }
+ 
+-#else
++                                                #elif defined(__SWITCH__)
+ 
+-dl_handle * dl_load_library(const fs::path & path) {
+-    dl_handle * handle = dlopen(path.string().c_str(), RTLD_NOW | RTLD_LOCAL);
+-    return handle;
+-}
++                                                // Dynamic loading is not supported on Horizon OS homebrew.
++                                                // Everything is statically linked into the single NRO, so these
++                                                // are unreachable stubs that keep the backend-registry code linking.
++
++                                                dl_handle * dl_load_library(const fs::path & /*path*/) {
++                                                    return nullptr;
++                                                    }
++
++                                                    void * dl_get_sym(dl_handle * /*handle*/, const char * /*name*/) {
++                                                        return nullptr;
++                                                        }
++
++                                                        const char * dl_error() {
++                                                            return "dynamic loading not supported on Switch";
++                                                            }
++
++                                                            #else
++
++                                                            dl_handle * dl_load_library(const fs::path & path) {
++                                                                dl_handle * handle = dlopen(path.string().c_str(), RTLD_NOW | RTLD_LOCAL);
++                                                                    return handle;
++                                                                    }
+ 
+-void * dl_get_sym(dl_handle * handle, const char * name) {
+-    return dlsym(handle, name);
+-}
++                                                                    void * dl_get_sym(dl_handle * handle, const char * name) {
++                                                                        return dlsym(handle, name);
++                                                                        }
+ 
+-const char * dl_error() {
+-    const char *rslt = dlerror();
+-    return rslt != nullptr ? rslt : "";
+-}
++                                                                        const char * dl_error() {
++                                                                            const char *rslt = dlerror();
++                                                                                return rslt != nullptr ? rslt : "";
++                                                                                }
+ 
+-#endif
++                                                                                #endif
++                                                                               
+diff --git a/ggml/src/ggml-backend-dl.h b/ggml/src/ggml-backend-dl.h
+index f74b7c948..35c366adb 100644
+--- a/ggml/src/ggml-backend-dl.h
++++ b/ggml/src/ggml-backend-dl.h
+@@ -7,39 +7,50 @@
+ #   endif
+ #   include <windows.h>
+ #   include <winevt.h>
+-#else
+-#    include <dlfcn.h>
+-#    include <unistd.h>
+-#endif
+-#include <filesystem>
++#elif defined(__SWITCH__)
++    // no dynamic loading on Horizon OS homebrew
++    #else
++    #    include <dlfcn.h>
++    #    include <unistd.h>
++    #endif
++    #include <filesystem>
+ 
+-namespace fs = std::filesystem;
++    namespace fs = std::filesystem;
+ 
+-#ifdef _WIN32
++    #ifdef _WIN32
++
++    using dl_handle = std::remove_pointer_t<HMODULE>;
++
++    struct dl_handle_deleter {
++        void operator()(HMODULE handle) {
++                FreeLibrary(handle);
++                    }
++                    };
+ 
+-using dl_handle = std::remove_pointer_t<HMODULE>;
++                    #elif defined(__SWITCH__)
+ 
+-struct dl_handle_deleter {
+-    void operator()(HMODULE handle) {
+-        FreeLibrary(handle);
+-    }
+-};
++                    using dl_handle = void;
+ 
+-#else
++                    struct dl_handle_deleter {
++                        void operator()(void * /*handle*/) {
++                                // no-op: dynamic loading unsupported on Switch
++                                    }
++                                    };
+ 
+-using dl_handle = void;
++                                    #else
+ 
+-struct dl_handle_deleter {
+-    void operator()(void * handle) {
+-        dlclose(handle);
+-    }
+-};
++                                    using dl_handle = void;
+ 
+-#endif
++                                    struct dl_handle_deleter {
++                                        void operator()(void * handle) {
++                                                dlclose(handle);
++                                                    }
++                                                    };
+ 
+-using dl_handle_ptr = std::unique_ptr<dl_handle, dl_handle_deleter>;
++                                                    #endif
+ 
+-dl_handle * dl_load_library(const fs::path & path);
+-void * dl_get_sym(dl_handle * handle, const char * name);
+-const char * dl_error();
++                                                    using dl_handle_ptr = std::unique_ptr<dl_handle, dl_handle_deleter>;
+ 
++                                                    dl_handle * dl_load_library(const fs::path & path);
++                                                    void * dl_get_sym(dl_handle * handle, const char * name);
++                                                    const char * dl_error();
+diff --git a/ggml/src/ggml-backend-reg.cpp b/ggml/src/ggml-backend-reg.cpp
+index e59594670..994b1a0cc 100644
+--- a/ggml/src/ggml-backend-reg.cpp
++++ b/ggml/src/ggml-backend-reg.cpp
+@@ -10,7 +10,6 @@
+ #include <type_traits>
+ #include <vector>
+ #include <cctype>
+-
+ #ifdef _WIN32
+ #    define WIN32_LEAN_AND_MEAN
+ #    ifndef NOMINMAX
+@@ -20,36 +19,16 @@
+ #elif defined(__APPLE__)
+ #    include <mach-o/dyld.h>
+ #    include <dlfcn.h>
++#elif defined(__SWITCH__)
++    // no dynamic loading / no /proc on Horizon OS homebrew
+ #else
+ #    include <dlfcn.h>
+ #    include <unistd.h>
+ #endif
+-
+-// Backend registry
+ #ifdef GGML_USE_CPU
+ #include "ggml-cpu.h"
+ #endif
+ 
+-#ifdef GGML_USE_CUDA
+-#include "ggml-cuda.h"
+-#endif
+-
+-#ifdef GGML_USE_METAL
+-#include "ggml-metal.h"
+-#endif
+-
+-#ifdef GGML_USE_SYCL
+-#include "ggml-sycl.h"
+-#endif
+-
+-#ifdef GGML_USE_VULKAN
+-#include "ggml-vulkan.h"
+-#endif
+-
+-#ifdef GGML_USE_WEBGPU
+-#include "ggml-webgpu.h"
+-#endif
+-
+ #ifdef GGML_USE_ZDNN
+ #include "ggml-zdnn.h"
+ #endif
