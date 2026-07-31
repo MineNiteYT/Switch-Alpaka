@@ -2,7 +2,7 @@
 
 Run local LLMs (GGUF models via [llama.cpp](https://github.com/ggml-org/llama.cpp)) natively on a
 homebrew-enabled Nintendo Switch — no internet connection required. CPU-only inference, console-based
-UI, model picker, and persistent multi-chat history saved to the SD card.
+UI, model picker, and persistent multi-chat history saved to the SD card. Disclaimer: This was Vibe Coded using Claude Sonnet 5
 
 ![status](https://img.shields.io/badge/status-alpha-orange)
 
