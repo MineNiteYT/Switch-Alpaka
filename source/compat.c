@@ -1,3 +1,8 @@
+// compat.c - POSIX shims missing from newlib on the Switch (devkitA64).
+// Needed by llama.cpp/ggml (llama-mmap.cpp, ggml.c, ggml-cpu.cpp).
+// Copied verbatim from the switch-llm-console project, where it's already
+// proven to link and run.
+
 #include <errno.h>
 #include <malloc.h>
 #include <unistd.h>

@@ -9,19 +9,29 @@ endif
 TOPDIR ?= $(CURDIR)
 include $(DEVKITPRO)/libnx/switch_rules
 
-TARGET      :=  switch-llm-console
+#---------------------------------------------------------------------------------
+TARGET      :=  alpaka
 BUILD       :=  build
 SOURCES     :=  source
 DATA        :=  data
 INCLUDES    :=  include
 
-APP_TITLE   :=  Switch LLM Console
-APP_AUTHOR  :=  Ruben
-APP_VERSION :=  0.1
+APP_TITLE   :=  Alpaka
+APP_AUTHOR  :=  MineNiteMii
+APP_VERSION :=  0.2
 
+# Same llama.cpp checkout/build as switch-llm-console. Point this elsewhere if
+# your GUI project lives somewhere that shouldn't share it.
 LLAMA_DIR   :=  $(HOME)/llama.cpp
 LLAMA_BUILD :=  $(LLAMA_DIR)/build-switch
 
+#---------------------------------------------------------------------------------
+# options for code generation
+# ARCH and CXXFLAGS copied from switch-llm-console's Makefile (the config that
+# is already known to link against libllama.a successfully) rather than the
+# stock devkitPro template, so the GUI and the llama.cpp static libs agree on
+# ABI-relevant flags (-fno-exceptions in particular).
+#---------------------------------------------------------------------------------
 ARCH    :=  -march=armv8-a+simd -mtune=cortex-a57 -mtp=soft -fPIE
 
 CFLAGS  :=  -g -Wall -O2 -ffunction-sections \
@@ -36,12 +46,19 @@ LDFLAGS  =  -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir 
 
 LIBS    :=  -Wl,--start-group -lllama -lggml -lggml-cpu -lggml-base -Wl,--end-group -lnx -lm
 
+#---------------------------------------------------------------------------------
 LIBDIRS := $(PORTLIBS) $(LIBNX)
 
 EXTRA_INCLUDES := -I$(LLAMA_DIR)/include -I$(LLAMA_DIR)/ggml/include
 EXTRA_LIBPATHS := -L$(LLAMA_BUILD)/src -L$(LLAMA_BUILD)/ggml/src
 
+# Model loading reserves a large heap for a multi-GB GGUF file, same as the
+# console version.
+NROFLAGS += --heap-reserve=0x80000000
+
+#---------------------------------------------------------------------------------
 ifneq ($(BUILD),$(notdir $(CURDIR)))
+#---------------------------------------------------------------------------------
 
 export OUTPUT   :=  $(CURDIR)/$(TARGET)
 export TOPDIR   :=  $(CURDIR)
@@ -56,16 +73,22 @@ CPPFILES    :=  $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES      :=  $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 BINFILES    :=  $(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 
+#---------------------------------------------------------------------------------
 ifeq ($(strip $(CPPFILES)),)
-	export LD := $(CC)
+#---------------------------------------------------------------------------------
+	export LD	:=	$(CC)
+#---------------------------------------------------------------------------------
 else
-	export LD := $(CXX)
+#---------------------------------------------------------------------------------
+	export LD	:=	$(CXX)
+#---------------------------------------------------------------------------------
 endif
+#---------------------------------------------------------------------------------
 
 export OFILES_BIN   :=  $(addsuffix .o,$(BINFILES))
-export OFILES_SRC    :=  $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
-export OFILES        :=  $(OFILES_BIN) $(OFILES_SRC)
-export HFILES_BIN    :=  $(addsuffix .h,$(subst .,_,$(BINFILES)))
+export OFILES_SRC   :=  $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
+export OFILES       :=  $(OFILES_BIN) $(OFILES_SRC)
+export HFILES_BIN   :=  $(addsuffix .h,$(subst .,_,$(BINFILES)))
 
 export INCLUDE  :=  $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
                      $(foreach dir,$(LIBDIRS),-I$(dir)/include) \
@@ -116,16 +139,16 @@ ifneq ($(ROMFS),)
 	export NROFLAGS += --romfsdir=$(CURDIR)/$(ROMFS)
 endif
 
-export NROFLAGS += --heap-reserve=0x80000000
-
 .PHONY: $(BUILD) clean all
 
+#---------------------------------------------------------------------------------
 all: $(BUILD)
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
+#---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
 ifeq ($(strip $(APP_JSON)),)
@@ -134,35 +157,50 @@ else
 	@rm -fr $(BUILD) $(TARGET).nsp $(TARGET).nso $(TARGET).npdm $(TARGET).elf
 endif
 
+
+#---------------------------------------------------------------------------------
 else
-.PHONY: all
+.PHONY:	all
 
-DEPENDS := $(OFILES:.o=.d)
+DEPENDS	:=	$(OFILES:.o=.d)
 
+#---------------------------------------------------------------------------------
+# main targets
+#---------------------------------------------------------------------------------
 ifeq ($(strip $(APP_JSON)),)
-all : $(OUTPUT).nro
+
+all	:	$(OUTPUT).nro
 
 ifeq ($(strip $(NO_NACP)),)
-$(OUTPUT).nro : $(OUTPUT).elf $(OUTPUT).nacp
+$(OUTPUT).nro	:	$(OUTPUT).elf $(OUTPUT).nacp
 else
-$(OUTPUT).nro : $(OUTPUT).elf
+$(OUTPUT).nro	:	$(OUTPUT).elf
 endif
 
 else
-all : $(OUTPUT).nsp
 
-$(OUTPUT).nsp : $(OUTPUT).nso $(OUTPUT).npdm
-$(OUTPUT).nso : $(OUTPUT).elf
+all	:	$(OUTPUT).nsp
+
+$(OUTPUT).nsp	:	$(OUTPUT).nso $(OUTPUT).npdm
+
+$(OUTPUT).nso	:	$(OUTPUT).elf
+
 endif
 
-$(OUTPUT).elf : $(OFILES)
+$(OUTPUT).elf	:	$(OFILES)
 
-$(OFILES_SRC) : $(HFILES_BIN)
+$(OFILES_SRC)	: $(HFILES_BIN)
 
-%.bin.o %_bin.h : %.bin
+#---------------------------------------------------------------------------------
+# you need a rule like this for each extension you use as binary data
+#---------------------------------------------------------------------------------
+%.bin.o	%_bin.h :	%.bin
+#---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)
 
 -include $(DEPENDS)
 
+#---------------------------------------------------------------------------------------
 endif
+#---------------------------------------------------------------------------------------
