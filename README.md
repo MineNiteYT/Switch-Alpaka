@@ -1,30 +1,39 @@
-# Switch-Alpaka
+# Alpaka
 
-Run local LLMs (GGUF models via [llama.cpp](https://github.com/ggml-org/llama.cpp)) natively on a
-homebrew-enabled Nintendo Switch — no internet connection required. CPU-only inference, console-based
-UI, model picker, and persistent multi-chat history saved to the SD card. Disclaimer: This was Vibe Coded using Claude Sonnet 5
+Run local LLMs (GGUF models via llama.cpp) natively on a homebrew-enabled
+Nintendo Switch — no internet connection required. CPU-only inference, a
+custom graphical UI (no SDL2), model picker, and persistent multi-chat
+history saved to the SD card.
 
-![status](https://img.shields.io/badge/status-alpha-orange)
+*Disclaimer: this project's GUI was built collaboratively with Claude Sonnet 5.*
+
+![Alpaka banner](branding/banner.png)
 
 ## Features
 
 - Pick any `.gguf` model dropped into `sdmc:/switch/llm/models/`
-- Multiple saved chats per model, stored as plain text on the SD card
+- Multiple saved chats per model, stored as compact binary files on the SD
+  card — resume, delete, or start fresh without reloading the model
 - Multi-turn conversation context (not just single-shot Q&A)
-- Runs fully offline, CPU-only (Tegra X1, no GPU/CUDA support — see [Background](#background))
+- Streaming, word-wrapped chat with inline markdown rendering (`**bold**`,
+  `` `code` ``, fenced code blocks)
+- Fully custom software renderer — a plain libnx framebuffer with
+  `stb_truetype` text, after an SDL2-based UI hit unresolved input crashes on
+  real hardware
+- Runs fully offline, CPU-only (Tegra X1, no GPU/CUDA support — see
+  [Background](#background))
 
 ## Requirements
 
 - A Switch with Atmosphère (or compatible) CFW and the homebrew launcher
-- [devkitPro](https://devkitpro.org/wiki/Getting_Started) with `devkitA64`, `switch-dev`, and
-  `switch-tools` installed
+- devkitPro with `devkitA64`, `switch-dev`, and `switch-tools` installed
 - A quantized `.gguf` model (see [Getting a model](#getting-a-model))
 
 ## Building
 
 ### 1. Install devkitPro (if you haven't already)
 
-```bash
+```sh
 wget https://apt.devkitpro.org/install-devkitpro-pacman
 chmod +x ./install-devkitpro-pacman
 sudo ./install-devkitpro-pacman
@@ -32,26 +41,33 @@ sudo dkp-pacman -S devkitA64 switch-dev switch-tools
 ```
 
 Make sure your environment has:
-```bash
+
+```sh
 export DEVKITPRO=/opt/devkitpro
 export DEVKITA64=${DEVKITPRO}/devkitA64
 export PATH=${DEVKITPRO}/tools/bin:${DEVKITA64}/bin:${PATH}
 ```
 
-### 2. Clone and patch llama.cpp
+### 2. Clone llama.cpp
 
-llama.cpp doesn't support Horizon OS out of the box. This repo ships a patch that adds Switch/newlib
-compatibility (no `dlfcn.h`/`mmap`, missing `posix_memalign`/`sysconf`, forces the CPU backend, etc).
-
-```bash
+```sh
 git clone https://github.com/ggml-org/llama.cpp
-cd llama.cpp
-git apply ../patches/llama-switch.patch
 ```
+
+> **TODO (Ruben):** the v0.1 console prototype applied a `patches/llama-switch.patch`
+> here for newlib compatibility (missing `posix_memalign`/`sysconf`, no
+> `dlfcn.h`/mmap, forcing the CPU backend). As of this GUI version, the
+> missing libc symbols are instead resolved by `source/compat.c`, compiled
+> straight into the app — no source patch required, as far as I can verify
+> from our own build logs. Please confirm whether `llama-switch.patch` is
+> still needed for anything else (e.g. an older llama.cpp checkout, or a
+> `dlfcn.h`-related compile error) before publishing — if it's obsolete,
+> delete this note and the `patches/` folder; if it's still needed, restore
+> the `git apply` step below it.
 
 ### 3. Cross-compile llama.cpp for the Switch
 
-```bash
+```sh
 mkdir build-switch && cd build-switch
 cmake .. -DCMAKE_TOOLCHAIN_FILE=../switch-toolchain.cmake \
   -DGGML_OPENMP=OFF \
@@ -71,42 +87,46 @@ make -j$(nproc)
 cd ../..
 ```
 
-The toolchain file (`switch-toolchain.cmake`) is included in this repo — copy it into your llama.cpp
-checkout before running `cmake`:
-```bash
+The toolchain file (`switch-toolchain.cmake`) is included in this repo —
+copy it into your llama.cpp checkout before running `cmake`:
+
+```sh
 cp switch-toolchain.cmake llama.cpp/
 ```
 
-### 4. Build Switch-Alpaka
+### 4. Build Alpaka
 
-Edit the `LLAMA_DIR` variable at the top of the `Makefile` if your llama.cpp checkout isn't at
-`~/llama.cpp`, then:
+Edit the `LLAMA_DIR` variable near the top of the `Makefile` if your
+llama.cpp checkout isn't at `~/llama.cpp`, then:
 
-```bash
+```sh
 export DEVKITPRO=/opt/devkitpro
 make -j$(nproc)
 ```
 
-This produces `switch-llm-console.nro`.
+This produces `alpaka-gui.nro`.
 
 ## Installing on your Switch
 
 Copy the following to your SD card:
 
 ```
-sdmc:/switch/switch-llm-console.nro
+sdmc:/switch/alpaka-gui.nro
 sdmc:/switch/llm/models/<your-model>.gguf
 ```
 
-`sdmc:/switch/llm/chats/` is created automatically on first launch.
+`sdmc:/switch/llm/chats/` is created automatically the first time you open a
+model's chat list.
 
 ## Getting a model
 
-Any GGUF model works in principle, but stick to **small, heavily quantized (Q4) models** — the Switch
-has 4 GB of RAM total and homebrew gets a fraction of that. Known-good starting points:
+Any GGUF model works in principle, but stick to small, heavily quantized
+(Q4) models — the Switch has 4 GB of RAM total and homebrew gets a fraction
+of that. Known-good starting points:
 
-- [Qwen2.5-0.5B-Instruct (Q4_K_M)](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF) — ~380 MB, fastest, least coherent
-- [Gemma-2-2B-it (Q4_K_M)](https://huggingface.co/bartowski/gemma-2-2b-it-GGUF) — ~1.6 GB, noticeably better quality, needs the heap-reserve bump already set in the Makefile
+- **Qwen2.5-0.5B-Instruct** (Q4_K_M) — ~380 MB, fastest, least coherent
+- **Gemma-2-2B-it** (Q4_K_M) — ~1.6 GB, noticeably better quality, needs the
+  heap-reserve bump already set in the Makefile
 
 Drop the `.gguf` file into `sdmc:/switch/llm/models/`.
 
@@ -114,39 +134,62 @@ Drop the `.gguf` file into `sdmc:/switch/llm/models/`.
 
 | Screen | Button | Action |
 |---|---|---|
-| Model picker | D-Pad / A | Select model |
-| Chat picker | D-Pad / A / B | New or existing chat / back |
-| Chat | A | Ask a question (opens the system keyboard) |
-| Chat | B | Back to chat list (model stays loaded) |
-| Any screen | + | Quit |
+| Model picker | A | Open chat list for the selected model |
+| | Y | Rescan the models folder |
+| | L / R | Page up / down |
+| Chat list | A | Open selected chat, or start a new one |
+| | Y | Delete selected chat (press again to confirm) |
+| | B | Back to model picker |
+| Chat | A | Write a message (opens the system keyboard) |
+| | B | Stop generation, or go back (model stays loaded) |
+| | X | Start a new chat |
+| | D-Pad / right stick | Scroll |
+| | ZL / ZR | Jump to top / jump to latest |
+| Any screen | − | Toggle debug overlay |
+| | + | Quit |
 
 ## Background
 
-This started as an experiment to see whether a Tegra X1 (Switch's SoC, same chip as the Jetson TX1)
-could run LLM inference at all under homebrew. Short version: yes, CPU-only, no CUDA (Nintendo never
-shipped the proprietary Nvidia CUDA driver stack on Horizon OS, and GPU compute would require a
-from-scratch Vulkan/deko3d compute backend for ggml — out of scope for now).
+This started as an experiment to see whether a Tegra X1 (Switch's SoC, same
+chip as the Jetson TX1) could run LLM inference at all under homebrew. Short
+version: yes, CPU-only, no CUDA (Nintendo never shipped the proprietary
+Nvidia CUDA driver stack on Horizon OS). GPU compute needs a from-scratch
+Vulkan/deko3d compute backend for ggml — a custom `ggml-deko3d` backend is in
+progress and has been validated in isolated hardware tests, but it isn't
+wired into this app yet.
 
-Expect roughly 1–3 tokens/second depending on model size and quantization. This is a fun toy, not a
-production inference stack. Even tho it is quite powerful!
+Expect roughly 1–3 tokens/second depending on model size and quantization —
+confirmed to be a Tegra X1 memory-bandwidth limit, not a GUI/rendering
+bottleneck (frame rate holds at 59–60 FPS during generation). This is a fun
+toy, not a production inference stack. Even tho it is quite powerful!
 
 ## Known limitations
 
-- No GPU acceleration
-- Conversation history is re-fed to the model on every turn (no incremental KV-cache reuse across
-  turns), so long chats get slower and can eventually exceed the context window
-- Console-only UI (an SDL2 graphical UI was attempted but hit unresolved runtime crashes — contributions
-  welcome, see [Contributing](#contributing))
+- No GPU acceleration yet (see [Background](#background))
+- Conversation history is re-fed to the model on every turn (no incremental
+  KV-cache reuse across turns), so long chats get slower and can eventually
+  exceed the context window
+- Markdown: no headers, lists, horizontal rules, or italics (would need
+  per-line font sizing, or a slanted font that isn't available on-device)
 
 ## Contributing
 
 PRs welcome, especially around:
-- SDL2/graphical UI (see [Known limitations](#known-limitations))
-- Chat management (rename/delete)
-- Context window handling for long conversations
+
+- GPU acceleration (wiring up `ggml-deko3d`)
+- Incremental KV-cache reuse for long conversations
+- Chat management (rename)
+- Markdown headers/lists/horizontal rules in the chat view
 - Testing on Switch V1 vs Mariko/V2 hardware
+
+## Credits
+
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) / ggml — inference engine
+- [libnx](https://github.com/switchbrew/libnx) / devkitPro — Switch homebrew toolchain
+- [stb_truetype](https://github.com/nothings/stb) — font rasterization
+- [Atmosphère](https://github.com/Atmosphere-NX/Atmosphere) + [Sphaira](https://github.com/ITotalJustice/sphaira) — CFW and homebrew launching used during development
 
 ## License
 
-MIT for the code in this repo. llama.cpp itself is MIT-licensed; see the patch file for the exact
-changes applied for Switch compatibility.
+MIT for the code in this repo, see [LICENSE](LICENSE). llama.cpp itself is
+MIT-licensed.
