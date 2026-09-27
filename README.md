@@ -104,14 +104,14 @@ export DEVKITPRO=/opt/devkitpro
 make -j$(nproc)
 ```
 
-This produces `alpaka-gui.nro`.
+This produces `alpaka.nro`.
 
 ## Installing on your Switch
 
 Copy the following to your SD card:
 
 ```
-sdmc:/switch/alpaka-gui.nro
+sdmc:/switch/alpaka.nro
 sdmc:/switch/llm/models/<your-model>.gguf
 ```
 
