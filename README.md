@@ -54,16 +54,6 @@ export PATH=${DEVKITPRO}/tools/bin:${DEVKITA64}/bin:${PATH}
 git clone https://github.com/ggml-org/llama.cpp
 ```
 
-> **TODO (Ruben):** the v0.1 console prototype applied a `patches/llama-switch.patch`
-> here for newlib compatibility (missing `posix_memalign`/`sysconf`, no
-> `dlfcn.h`/mmap, forcing the CPU backend). As of this GUI version, the
-> missing libc symbols are instead resolved by `source/compat.c`, compiled
-> straight into the app — no source patch required, as far as I can verify
-> from our own build logs. Please confirm whether `llama-switch.patch` is
-> still needed for anything else (e.g. an older llama.cpp checkout, or a
-> `dlfcn.h`-related compile error) before publishing — if it's obsolete,
-> delete this note and the `patches/` folder; if it's still needed, restore
-> the `git apply` step below it.
 
 ### 3. Cross-compile llama.cpp for the Switch
 
