@@ -1,4 +1,4 @@
-// mock_backend.cpp - fake inference engine for testing the chat UI on hardware.
+
 #include "backend.hpp"
 
 #include <switch.h>
@@ -16,7 +16,7 @@ struct Job {
     std::atomic<bool>* cancel       = nullptr;
 };
 
-// Sleeps in small slices so cancel() is noticed quickly.
+
 void sleepMs(int ms, const std::atomic<bool>* cancel) {
     while (ms > 0 && !cancel->load()) {
         const int slice = ms < 20 ? ms : 20;
@@ -28,13 +28,13 @@ void sleepMs(int ms, const std::atomic<bool>* cancel) {
 void workerMain(void* arg) {
     Job* j = static_cast<Job*>(arg);
 
-    sleepMs(900, j->cancel);  // pretend to process the prompt
+    sleepMs(900, j->cancel);
 
     const std::string& r = j->reply;
     size_t i = 0;
     while (i < r.size() && !j->cancel->load()) {
-        // One "token": a newline, or optional leading spaces + a word.
-        // Only ASCII whitespace is split, so UTF-8 sequences stay intact.
+
+
         const size_t start = i;
         if (r[i] == '\n') {
             i++;
@@ -127,7 +127,7 @@ private:
     bool              running_ = false;
 };
 
-}  // namespace
+}
 
 ChatBackend* createMockBackend(const std::string& modelName, int tokensPerSecond) {
     return new MockBackend(modelName, tokensPerSecond);

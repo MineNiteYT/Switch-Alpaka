@@ -1,9 +1,9 @@
-// Alpaka GUI - Stage 2
-//   * model picker (scans sdmc:/switch/llm/models/*.gguf)
-//   * chat screen with streaming, wrapping, scrolling and swkbd input
-//   * a MOCK backend streams a canned reply - the llama.cpp glue comes later
-//
-// Controls: see the footer of each screen. Debug panel: - (minus). Exit: + (plus).
+
+
+
+
+
+
 
 #include <switch.h>
 
@@ -31,7 +31,7 @@ namespace col = gui::col;
 
 const char* const kModelDir = "sdmc:/switch/llm/models";
 
-// ---------------------------------------------------------------- model list
+
 
 struct ModelEntry {
     std::string name;
@@ -75,11 +75,11 @@ std::string formatSize(u64 bytes) {
 }
 
 std::string stripExtension(const std::string& n) {
-    if (n.size() > 5) return n.substr(0, n.size() - 5);  // ".gguf"
+    if (n.size() > 5) return n.substr(0, n.size() - 5);
     return n;
 }
 
-// Fires on the initial press, then repeats while the button stays held (~60 fps).
+
 bool repeatFire(u64 down, u64 held, u64 mask, int& counter) {
     if (down & mask) {
         counter = 0;
@@ -93,7 +93,7 @@ bool repeatFire(u64 down, u64 held, u64 mask, int& counter) {
     return false;
 }
 
-// -------------------------------------------------------------- picker screen
+
 
 const int kRowH = 64, kRowGap = 6, kVisible = 8;
 const int kListX = 40, kListY = 150, kListW = 720;
@@ -106,7 +106,7 @@ struct PickerState {
     int                     toastFrames = 0;
 };
 
-// Returns true when the user picked a model (A).
+
 bool updatePicker(PickerState& ps, u64 down, u64 held) {
     const int n = (int)ps.models.size();
     bool open = false;
@@ -178,7 +178,7 @@ void drawPicker(const PickerState& ps, int fps) {
         }
     }
 
-    // Detail panel
+
     const int dx = 820, dy = 106, dw = gui::W - 40 - dx, dh = 530;
     gui::fillRoundRect(dx, dy, dw, dh, 14, col::panel);
     gui::drawText(dx + 28, dy + 20, "DETAILS", FontSize::Small, col::textDim);
@@ -204,7 +204,7 @@ void drawPicker(const PickerState& ps, int fps) {
         gui::drawText(dx + 28, dy + 64, "Nothing selected", FontSize::Normal, col::textDim);
     }
 
-    // Toast
+
     if (ps.toastFrames > 0) {
         const std::string t  = gui::ellipsize(ps.toast, 900, FontSize::Normal);
         const int         tw = gui::textWidth(t, FontSize::Normal) + 56;
@@ -223,11 +223,11 @@ void drawPicker(const PickerState& ps, int fps) {
     gui::drawFooter(hints, (fps < 0 ? std::string("--") : std::to_string(fps)) + " FPS");
 }
 
-// ------------------------------------------------------------- model loading
-//
-// llama_model_load_from_file() blocks for real time (reading a multi-GB file
-// from the SD card), so it runs on a worker thread while the GUI keeps drawing
-// a spinner. Only one load can be in flight at a time.
+
+
+
+
+
 
 struct Loader {
     Thread              thread{};
@@ -235,10 +235,10 @@ struct Loader {
     std::atomic<bool>   done{false};
     ChatBackend*         result = nullptr;
     std::string          err;
-    std::string          modelName;   // for the spinner text
-    std::string          path, name;  // arguments captured for the worker
+    std::string          modelName;
+    std::string          path, name;
 
-    // Passed straight through to the constructed ChatScreen once loading finishes.
+
     std::string             modelStem;
     uint32_t                chatId = 0;
     std::vector<ChatMessage> initialHistory;
@@ -249,8 +249,8 @@ struct Loader {
         l->done.store(true);
     }
 
-    // `stem`/`id`/`history` describe which saved chat (if any) to resume;
-    // pass id=0 and an empty history for a brand-new chat.
+
+
     void start(const std::string& modelPath, const std::string& displayName, const std::string& stem,
               uint32_t id, std::vector<ChatMessage> history) {
         path           = modelPath;
@@ -273,7 +273,7 @@ struct Loader {
         running = true;
     }
 
-    // Call once done.load() is true to release the thread handle.
+
     void join() {
         if (running) {
             threadWaitForExit(&thread);
@@ -323,9 +323,9 @@ void fatalConsole(const std::string& msg) {
     consoleExit(NULL);
 }
 
-}  // namespace
+}
 
-// ----------------------------------------------------------------------- main
+
 
 int main(int, char**) {
     std::string err;
@@ -358,7 +358,7 @@ int main(int, char**) {
         if (down & HidNpadButton_Plus) break;
         if (down & HidNpadButton_Minus) showDebug = !showDebug;
 
-        // ------------------------------------------------------------ update
+
         if (loading) {
             if (loader.done.load()) {
                 loader.join();
@@ -366,7 +366,7 @@ int main(int, char**) {
                 if (loader.result) {
                     chat.reset(new ChatScreen(loader.result, loader.modelStem, loader.chatId,
                                               loader.initialHistory));
-                    chatList.reset();  // freed; rebuilt (rescanned) when we come back
+                    chatList.reset();
                 } else if (chatList) {
                     chatList->notifyError("Load failed: " + loader.err);
                 } else {
@@ -376,7 +376,7 @@ int main(int, char**) {
             }
         } else if (chat) {
             if (chat->update(pad, down, held) == ChatScreen::Action::Back) {
-                chat.reset();  // destructor saves the chat
+                chat.reset();
                 if (chatList) chatList->rescan();
             }
         } else if (chatList) {
@@ -387,7 +387,7 @@ int main(int, char**) {
                 const ModelEntry& m    = picker.models[picker.sel];
                 const std::string stem = chat_store::modelStem(stripExtension(m.name));
                 std::vector<ChatMessage> history;
-                std::string              title;  // unused - ChatScreen re-derives it on save
+                std::string              title;
                 if (chatList->openId() != 0) chat_store::loadChat(stem, chatList->openId(), history, title);
                 loader.start(m.path, stripExtension(m.name), stem, chatList->openId(), history);
                 loading = true;
@@ -398,7 +398,7 @@ int main(int, char**) {
                                               stripExtension(m.name)));
         }
 
-        // ------------------------------------------------------------ render
+
         gui::beginFrame(col::bg);
         if (loading)
             drawLoading(loader.modelName, totalFrames);
@@ -427,7 +427,7 @@ int main(int, char**) {
         }
         gui::endFrame();
 
-        // ------------------------------------------------------- FPS counter
+
         frames++;
         totalFrames++;
         const u64 now       = armGetSystemTick();
@@ -440,7 +440,7 @@ int main(int, char**) {
         }
     }
 
-    chat.reset();  // joins the worker thread
+    chat.reset();
     gui::shutdown();
     return 0;
 }

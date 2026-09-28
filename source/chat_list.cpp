@@ -1,4 +1,4 @@
-// chat_list.cpp
+
 #include "chat_list.hpp"
 
 #include <algorithm>
@@ -24,7 +24,7 @@ bool repeatFire(u64 down, u64 held, u64 mask, int& counter) {
     counter = 0;
     return false;
 }
-}  // namespace
+}
 
 ChatListScreen::ChatListScreen(std::string modelStem, std::string modelDisplayName)
     : modelStem_(std::move(modelStem)), modelDisplayName_(std::move(modelDisplayName)) {
@@ -33,7 +33,7 @@ ChatListScreen::ChatListScreen(std::string modelStem, std::string modelDisplayNa
 
 void ChatListScreen::rescan() {
     chats_ = chat_store::listChats(modelStem_);
-    const int n = (int)chats_.size() + 1;  // +1 for the pinned "New chat" row
+    const int n = (int)chats_.size() + 1;
     sel_        = std::min(sel_, n - 1);
     scroll_     = 0;
     confirmingDelete_ = false;

@@ -1,4 +1,3 @@
-// chat.cpp - the chat screen.
 #include "chat.hpp"
 
 #include <algorithm>
@@ -16,14 +15,14 @@ namespace col = gui::col;
 
 namespace {
 
-// Vertical layout: header 0..86, messages [kViewTop, kViewBottom), input bar, footer 660..720.
+
 const int kViewTop     = 100;
 const int kViewBottom  = 584;
 const int kInputY      = 596;
 const int kInputH      = 52;
 const int kMarginX     = 40;
-const int kRightEdge   = 1228;  // right edge of user bubbles (scrollbar lives right of it)
-const int kMaxTextW    = 860;   // wrap width of message text
+const int kRightEdge   = 1228;
+const int kMaxTextW    = 860;
 const int kPadX        = 20;
 const int kPadY        = 12;
 const int kGap         = 16;
@@ -45,12 +44,7 @@ std::string trim(const std::string& s) {
     return s.substr(a, b - a);
 }
 
-// Draws one already-wrapped line with inline bold/code styling applied (see
-// markdown.hpp). There's no bold or monospace font on this device, so bold is
-// faked by drawing the text twice with a 1px horizontal offset (a classic
-// "poor man's bold"), and code spans are distinguished with a pill background
-// and the accent color instead of a real monospace face. Returns the pixel
-// width drawn (used to place the streaming caret).
+
 int drawStyledLine(int x, int y, const gui::WrappedLine& line, const std::vector<MdRun>& runs,
                    FontSize size, u32 normalColor) {
     const std::string& text = line.text;
@@ -58,7 +52,7 @@ int drawStyledLine(int x, int y, const gui::WrappedLine& line, const std::vector
     size_t pos     = 0;
     while (pos < text.size()) {
         MdStyle style        = MdStyle::Normal;
-        size_t  runEndInLine = text.size();  // fallback: no matching run -> draw the rest as Normal
+        size_t  runEndInLine = text.size();
         for (size_t r = 0; r < runs.size(); r++) {
             const size_t abs = line.startOffset + pos;
             if (runs[r].start <= abs && abs < runs[r].start + runs[r].len) {
@@ -75,16 +69,16 @@ int drawStyledLine(int x, int y, const gui::WrappedLine& line, const std::vector
             gui::fillRoundRect(cursorX - 4, y - 2, segW + 8, gui::lineHeight(size) + 4, 6, col::panelHi);
         }
         const u32 color = style == MdStyle::Code ? col::accent : normalColor;
-        if (style == MdStyle::Bold) gui::drawText(cursorX + 1, y, seg, size, color);  // fake-bold pass
+        if (style == MdStyle::Bold) gui::drawText(cursorX + 1, y, seg, size, color);
         cursorX += gui::drawText(cursorX, y, seg, size, color);
         pos = runEndInLine;
     }
     return cursorX - x;
 }
 
-}  // namespace
+}
 
-// ------------------------------------------------------------------ lifecycle
+
 
 ChatScreen::ChatScreen(ChatBackend* backend, std::string modelStem, uint32_t chatId,
                        std::vector<ChatMessage> initialHistory)
@@ -94,16 +88,16 @@ ChatScreen::ChatScreen(ChatBackend* backend, std::string modelStem, uint32_t cha
 }
 
 ChatScreen::~ChatScreen() {
-    // Stop and join the worker first: its callbacks point into this object.
+
     if (backend_) {
         backend_->cancel();
         backend_.reset();
     }
-    flushPendingIntoMessages();  // pick up anything the worker produced right before cancel()
+    flushPendingIntoMessages();
     saveIfDirty();
 }
 
-// ------------------------------------------------------------------- helpers
+
 
 std::string ChatScreen::statusText(u32& color) const {
     char b[64];
@@ -132,7 +126,7 @@ std::string ChatScreen::statusText(u32& color) const {
 }
 
 void ChatScreen::startNewChat() {
-    saveIfDirty();  // persist whatever was open before wiping it
+    saveIfDirty();
 
     messages_.clear();
     layouts_.clear();
@@ -154,9 +148,7 @@ void ChatScreen::saveIfDirty() {
         chatId_ = saved;
         dirty_  = false;
     }
-    // saved == 0 means the write failed (SD card full/removed, etc.) - dirty_
-    // stays true so the next save attempt (e.g. on the next exchange) retries
-    // rather than silently losing the chat.
+
 }
 
 bool ChatScreen::askForText(std::string& out) {
@@ -176,7 +168,7 @@ bool ChatScreen::askForText(std::string& out) {
     std::memset(buf, 0, sizeof buf);
     rc = swkbdShow(&kbd, buf, sizeof buf);
     swkbdClose(&kbd);
-    if (R_FAILED(rc)) return false;  // cancelled
+    if (R_FAILED(rc)) return false;
 
     const std::string text = trim(buf);
     if (text.empty()) return false;
@@ -198,9 +190,9 @@ void ChatScreen::sendMessage(const std::string& text) {
     tokPerSec_ = 0.f;
     state_     = State::Waiting;
     follow_    = true;
-    dirty_     = true;  // the new user message alone is worth persisting
+    dirty_     = true;
 
-    // The history handed to the backend ends with the new user message.
+
     std::vector<ChatMessage> history(messages_.begin(), messages_.end() - 1);
 
     {
@@ -227,7 +219,7 @@ void ChatScreen::sendMessage(const std::string& text) {
 }
 
 void ChatScreen::drainPending() {
-    if (flushPendingIntoMessages()) saveIfDirty();  // exchange just finished - persist it
+    if (flushPendingIntoMessages()) saveIfDirty();
 }
 
 bool ChatScreen::flushPendingIntoMessages() {
@@ -261,7 +253,7 @@ bool ChatScreen::flushPendingIntoMessages() {
         if (!messages_.empty() && messages_.back().role == ChatMessage::Role::Assistant) {
             std::string& t = messages_.back().text;
             if (ok) {
-                // finished normally
+
             } else if (err == "cancelled") {
                 if (t.empty()) t = "[stopped]";
             } else {
@@ -283,7 +275,7 @@ void ChatScreen::relayout() {
     for (size_t i = 0; i < messages_.size(); i++) {
         Layout&            L = layouts_[i];
         const std::string& t = messages_[i].text;
-        if (L.textLen != t.size()) {  // text changed (streaming) -> re-wrap this message only
+        if (L.textLen != t.size()) {
             const ParsedMarkdown pm = parseInlineMarkdown(t);
             L.lines = gui::wrapTextOffsets(pm.plain, kMaxTextW, kMsgFont);
             L.runs  = pm.runs;
@@ -300,7 +292,7 @@ void ChatScreen::relayout() {
     contentH_ = std::max(0, y - kGap);
 }
 
-// --------------------------------------------------------------------- update
+
 
 ChatScreen::Action ChatScreen::update(const PadState& pad, u64 down, u64 held) {
     frame_++;
@@ -309,7 +301,7 @@ ChatScreen::Action ChatScreen::update(const PadState& pad, u64 down, u64 held) {
     drainPending();
     relayout();
 
-    // ---- scrolling
+
     const int viewH     = kViewBottom - kViewTop;
     const int maxScroll = std::max(0, contentH_ - viewH);
 
@@ -317,15 +309,15 @@ ChatScreen::Action ChatScreen::update(const PadState& pad, u64 down, u64 held) {
     if (held & HidNpadButton_Up) delta -= 24.f;
     if (held & HidNpadButton_Down) delta += 24.f;
     const HidAnalogStickState rs = padGetStickPos(&pad, 1);
-    if (std::abs(rs.y) > 6000) delta -= (float)rs.y / 32767.f * 32.f;  // stick up = older messages
+    if (std::abs(rs.y) > 6000) delta -= (float)rs.y / 32767.f * 32.f;
     if (down & HidNpadButton_L) delta -= (float)(viewH - 60);
     if (down & HidNpadButton_R) delta += (float)(viewH - 60);
 
-    if (down & HidNpadButton_ZL) {  // jump to the top
+    if (down & HidNpadButton_ZL) {
         scroll_ = 0;
         follow_ = false;
     }
-    if (down & HidNpadButton_ZR) follow_ = true;  // jump to the newest text
+    if (down & HidNpadButton_ZR) follow_ = true;
 
     if (delta != 0.f) {
         scroll_ += (int)std::lround(delta);
@@ -335,7 +327,7 @@ ChatScreen::Action ChatScreen::update(const PadState& pad, u64 down, u64 held) {
     if (delta > 0.f && scroll_ >= maxScroll) follow_ = true;
     if (follow_) scroll_ = maxScroll;
 
-    // ---- actions
+
     if (state_ == State::Idle) {
         if (down & HidNpadButton_A) {
             std::string text;
@@ -345,18 +337,18 @@ ChatScreen::Action ChatScreen::update(const PadState& pad, u64 down, u64 held) {
         if (down & HidNpadButton_B) return Action::Back;
     } else if ((down & HidNpadButton_B) && state_ != State::Stopping) {
         state_ = State::Stopping;
-        backend_->cancel();  // onDone arrives shortly and returns us to Idle
+        backend_->cancel();
     }
     return Action::None;
 }
 
-// ----------------------------------------------------------------------- draw
+
 
 void ChatScreen::draw(int fps) {
     const int lh    = gui::lineHeight(kMsgFont);
     const int viewH = kViewBottom - kViewTop;
 
-    // ---- messages (drawn first; the bars below cover anything that overflows)
+
     if (messages_.empty()) {
         gui::drawTextCentered(gui::W / 2, 230, "Start a conversation", FontSize::Large, col::text);
         gui::drawTextCentered(gui::W / 2, 290, "Press A to write your first message", FontSize::Normal,
@@ -366,7 +358,7 @@ void ChatScreen::draw(int fps) {
     for (size_t i = 0; i < messages_.size() && i < layouts_.size(); i++) {
         const Layout& L = layouts_[i];
         const int top = kViewTop + L.y - scroll_;
-        if (top + L.height < kViewTop - 4 || top > kViewBottom + 4) continue;  // off screen
+        if (top + L.height < kViewTop - 4 || top > kViewBottom + 4) continue;
 
         const bool user   = messages_[i].role == ChatMessage::Role::User;
         const bool isLast = i + 1 == messages_.size();
@@ -394,7 +386,7 @@ void ChatScreen::draw(int fps) {
             drawStyledLine(bx + kPadX, ly, L.lines[k], L.runs, kMsgFont, fg);
         }
 
-        // blinking caret at the end of the streaming text
+
         if (!user && isLast && state_ == State::Streaming && ((frame_ / 30) % 2) == 0 &&
             !L.lines.empty()) {
             const int cx = bx + kPadX + gui::textWidth(L.lines.back().text, kMsgFont) + 3;
@@ -403,7 +395,7 @@ void ChatScreen::draw(int fps) {
         }
     }
 
-    // ---- scrollbar
+
     if (contentH_ > viewH) {
         const int maxScroll = contentH_ - viewH;
         const int thumbH    = std::max(32, viewH * viewH / contentH_);
@@ -412,7 +404,7 @@ void ChatScreen::draw(int fps) {
         gui::fillRoundRect(1244, thumbY, 6, thumbH, 3, col::accent);
     }
 
-    // ---- "jump to latest" pill
+
     if (!follow_ && contentH_ > viewH) {
         const int pw = 190, ph = 40;
         const int px = kRightEdge - pw, py = kViewBottom - ph - 12;
@@ -422,16 +414,16 @@ void ChatScreen::draw(int fps) {
         gui::drawText(px + 16 + iw + 10, py + (ph - lh) / 2, "Latest", kMsgFont, col::text);
     }
 
-    // ---- cover the overflow above/below the message area
+
     gui::fillRect(0, 0, gui::W, kViewTop, col::bg);
     gui::fillRect(0, kViewBottom, gui::W, gui::H - kViewBottom, col::bg);
 
-    // ---- header
+
     u32 statusColor = col::textDim;
     const std::string status = statusText(statusColor);
     gui::drawHeader(backend_->modelName(), FontSize::Large, status, statusColor);
 
-    // ---- input bar
+
     gui::fillRoundRect(kMarginX, kInputY, gui::W - 2 * kMarginX, kInputH, 14, col::panel);
     {
         const bool busy = state_ != State::Idle;
@@ -442,7 +434,7 @@ void ChatScreen::draw(int fps) {
                       kMsgFont, col::textDim);
     }
 
-    // ---- toast
+
     if (toastFrames_ > 0) {
         const std::string t  = gui::ellipsize(toast_, 800, FontSize::Normal);
         const int         tw = gui::textWidth(t, FontSize::Normal) + 56;
@@ -452,7 +444,7 @@ void ChatScreen::draw(int fps) {
         gui::drawText(tx + 28, ty + 10, t, FontSize::Normal, col::bg);
     }
 
-    // ---- footer
+
     std::vector<gui::Hint> hints;
     if (state_ == State::Idle) {
         hints.push_back(gui::Hint(gui::ButtonIcon::A, "Write"));

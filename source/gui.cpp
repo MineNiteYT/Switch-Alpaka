@@ -1,4 +1,4 @@
-// gui.cpp - minimal software GUI for libnx (no SDL2)
+
 #include "gui.hpp"
 
 #include <algorithm>
@@ -16,15 +16,15 @@
 namespace gui {
 namespace {
 
-// ---------------------------------------------------------------- framebuffer
+
 
 Framebuffer g_fb;
 bool        g_fbReady   = false;
 bool        g_plReady   = false;
 u32*        g_pix       = nullptr;
-u32         g_stride    = 0;  // in pixels
+u32         g_stride    = 0;
 
-// Blend `color` over *dst. `cov` (0..255) is extra coverage, e.g. glyph alpha.
+
 inline void blend(u32* dst, u32 color, u32 cov) {
     u32 a = (cov * (color >> 24) + 127) / 255;
     if (a == 0) return;
@@ -45,7 +45,7 @@ inline void plot(int x, int y, u32 color, u32 cov) {
     blend(&g_pix[(size_t)y * g_stride + x], color, cov);
 }
 
-// ----------------------------------------------------------------------- font
+
 
 struct Glyph {
     unsigned char* bmp = nullptr;
@@ -56,14 +56,14 @@ struct Glyph {
 
 struct FontFace {
     float scale    = 0.f;
-    float extScale = 0.f;  // scale for the Nintendo extension (button icon) font
+    float extScale = 0.f;
     int   ascent = 0;
     int   lineH  = 0;
     std::unordered_map<uint32_t, Glyph> cache;
 };
 
-stbtt_fontinfo g_info;      // standard system font (Latin text)
-stbtt_fontinfo g_extInfo;   // Nintendo extension font (button icons, U+E000..U+F8FF)
+stbtt_fontinfo g_info;
+stbtt_fontinfo g_extInfo;
 bool           g_extReady = false;
 FontFace       g_faces[4];
 
@@ -116,8 +116,8 @@ bool initFont(std::string& err) {
         return false;
     }
 
-    // The button icons (A, B, X, Y, L, R, +, ...) live in a separate shared font.
-    // Not fatal if it is missing: icons then show up as "?".
+
+
     PlFontData ed;
     std::memset(&ed, 0, sizeof ed);
     g_diag.extRc = plGetSharedFontByType(&ed, PlSharedFontType_NintendoExt);
@@ -136,7 +136,7 @@ bool initFont(std::string& err) {
         FontFace& f = g_faces[i];
         f.scale = stbtt_ScaleForPixelHeight(&g_info, kPixelHeight[i]);
         if (g_extReady) {
-            // Give the icon font the same em size (in pixels) as the text font.
+
             const float emPx = f.scale / stbtt_ScaleForMappingEmToPixels(&g_info, 1.0f);
             f.extScale = stbtt_ScaleForMappingEmToPixels(&g_extInfo, emPx);
         }
@@ -148,7 +148,7 @@ bool initFont(std::string& err) {
     return true;
 }
 
-// Decodes one UTF-8 code point and advances `p`.
+
 uint32_t nextCodepoint(const char*& p) {
     unsigned char c = (unsigned char)*p++;
     if (c < 0x80) return c;
@@ -187,7 +187,7 @@ const Glyph& getGlyph(FontFace& f, uint32_t cp) {
     } else {
         gi = stbtt_FindGlyphIndex(&g_info, (int)cp);
     }
-    if (gi == 0) gi = stbtt_FindGlyphIndex(&g_info, '?');  // visible "missing glyph" marker
+    if (gi == 0) gi = stbtt_FindGlyphIndex(&g_info, '?');
 
     int adv, lsb;
     stbtt_GetGlyphHMetrics(info, gi, &adv, &lsb);
@@ -210,9 +210,9 @@ const Glyph& getGlyph(FontFace& f, uint32_t cp) {
     return f.cache.emplace(cp, g).first->second;
 }
 
-}  // namespace
+}
 
-// ----------------------------------------------------------------- lifecycle
+
 
 bool init(std::string& err) {
     if (!initFont(err)) return false;
@@ -223,8 +223,8 @@ bool init(std::string& err) {
         err = "framebufferCreate failed (rc=" + hex(rc) + ")";
         return false;
     }
-    // Linear mode = normal cached CPU memory. Required for alpha blending,
-    // because blending reads the destination pixels back.
+
+
     framebufferMakeLinear(&g_fb);
     g_fbReady = true;
     return true;
@@ -257,7 +257,7 @@ void endFrame() {
     g_pix = nullptr;
 }
 
-// ---------------------------------------------------------------- primitives
+
 
 void fillRect(int x, int y, int w, int h, u32 color) {
     int x0 = std::max(x, 0), y0 = std::max(y, 0);
@@ -283,12 +283,12 @@ void fillRoundRect(int x, int y, int w, int h, int r, u32 color) {
         return;
     }
 
-    // Straight parts.
+
     fillRect(x + r, y, w - 2 * r, h, color);
     fillRect(x, y + r, r, h - 2 * r, color);
     fillRect(x + w - r, y + r, r, h - 2 * r, color);
 
-    // Anti-aliased corners.
+
     for (int cj = 0; cj < 2; cj++) {
         for (int ci = 0; ci < 2; ci++) {
             const int cx  = ci == 0 ? x + r : x + w - r;
@@ -309,7 +309,7 @@ void fillRoundRect(int x, int y, int w, int h, int r, u32 color) {
     }
 }
 
-// ---------------------------------------------------------------------- text
+
 
 int lineHeight(FontSize size) { return g_faces[(int)size].lineH; }
 
@@ -333,7 +333,7 @@ int drawText(int x, int y, const std::string& s, FontSize size, u32 color) {
     const char* p = s.c_str();
     while (*p) {
         uint32_t cp = nextCodepoint(p);
-        if (cp < 0x20) continue;  // control characters (newlines are handled by callers)
+        if (cp < 0x20) continue;
 
         const Glyph& g = getGlyph(f, cp);
         if (g.bmp) {
@@ -393,7 +393,7 @@ int drawTextClipped(int x, int y, int maxWidth, const std::string& s, FontSize s
     return drawText(x, y, ellipsize(s, maxWidth, size), size, color);
 }
 
-// --------------------------------------------------------------------- icons
+
 
 namespace {
 
@@ -433,20 +433,20 @@ bool hasExtGlyph(uint32_t cp) {
     return g_extReady && stbtt_FindGlyphIndex(&g_extInfo, (int)cp) != 0;
 }
 
-}  // namespace
+}
 
 int drawButtonIcon(int x, int y, ButtonIcon icon, u32 color, u32 bgColor) {
     const FontSize sz = FontSize::Normal;
     const uint32_t cp = iconCodepoint(icon);
 
     if (hasExtGlyph(cp)) {
-        // 3-byte UTF-8 encoding (all icon codepoints are in U+E000..U+F8FF).
+
         char buf[4] = {(char)(0xE0 | (cp >> 12)), (char)(0x80 | ((cp >> 6) & 0x3F)),
                        (char)(0x80 | (cp & 0x3F)), 0};
         return drawText(x, y, buf, sz, color);
     }
 
-    // Fallback: draw the icon ourselves.
+
     const bool shoulder = icon == ButtonIcon::L || icon == ButtonIcon::R ||
                           icon == ButtonIcon::ZL || icon == ButtonIcon::ZR;
     const int d  = 28;
@@ -467,7 +467,7 @@ int drawButtonIcon(int x, int y, ButtonIcon icon, u32 color, u32 bgColor) {
     return w;
 }
 
-// --------------------------------------------------------------------- debug
+
 
 std::vector<std::string> debugLines() {
     char b[160];
@@ -495,7 +495,7 @@ std::vector<std::string> debugLines() {
 }
 
 
-// ---------------------------------------------------------------------- wrap
+
 
 std::vector<std::string> wrapText(const std::string& s, int maxWidth, FontSize size) {
     std::vector<WrappedLine> wl = wrapTextOffsets(s, maxWidth, size);
@@ -509,12 +509,12 @@ std::vector<WrappedLine> wrapTextOffsets(const std::string& s, int maxWidth, Fon
     FontFace& f = g_faces[(int)size];
     std::vector<WrappedLine> lines;
     std::string          line;
-    std::vector<size_t>  lineOff;  // parallel to `line`: source byte offset of each byte.
-                                    // Tracked explicitly (rather than derived by arithmetic)
-                                    // so a dropped '\r' never throws off later offsets.
+    std::vector<size_t>  lineOff;
+
+
     float  lineW = 0.f;
-    size_t lastSpace = std::string::npos;  // byte index of the last space inside `line`
-    float  widthAfterSpace = 0.f;          // lineW right after that space
+    size_t lastSpace = std::string::npos;
+    float  widthAfterSpace = 0.f;
 
     const char* base = s.c_str();
     const char* p    = base;
@@ -546,7 +546,7 @@ std::vector<WrappedLine> wrapTextOffsets(const std::string& s, int maxWidth, Fon
 
         const float adv = getGlyph(f, cp).advance;
         if (lineW + adv > (float)maxWidth && !line.empty()) {
-            if (cp == ' ') {  // a space that does not fit simply ends the line
+            if (cp == ' ') {
                 pushLine(charOff);
                 line.clear();
                 lineOff.clear();
@@ -584,7 +584,7 @@ std::vector<WrappedLine> wrapTextOffsets(const std::string& s, int maxWidth, Fon
     return lines;
 }
 
-// --------------------------------------------------------------- screen chrome
+
 
 void drawHeader(const std::string& title, FontSize titleSize, const std::string& right, u32 rightColor) {
     fillRect(0, 0, W, 84, col::header);
@@ -607,4 +607,4 @@ void drawFooter(const std::vector<Hint>& hints, const std::string& rightText) {
     if (!rightText.empty()) drawTextRight(W - 40, fy, rightText, FontSize::Normal, col::textDim);
 }
 
-}  // namespace gui
+}

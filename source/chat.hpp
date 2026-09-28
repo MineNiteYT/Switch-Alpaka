@@ -1,4 +1,3 @@
-// chat.hpp - the chat screen: message bubbles, streaming, scrolling, text input.
 #pragma once
 
 #include <switch.h>
@@ -16,15 +15,12 @@ class ChatScreen {
 public:
     enum class Action { None, Back };
 
-    // `modelStem` identifies the model's chat folder on the SD card (see
-    // chat_store.hpp). `chatId` == 0 with an empty `initialHistory` starts a
-    // brand-new, not-yet-saved chat; a non-zero id resumes a saved one.
-    // Takes ownership of `backend`.
+
     ChatScreen(ChatBackend* backend, std::string modelStem, uint32_t chatId,
               std::vector<ChatMessage> initialHistory);
     ~ChatScreen();
 
-    // Call once per frame before draw(): drains streamed tokens, handles input.
+
     Action update(const PadState& pad, u64 down, u64 held);
     void   draw(int fps);
 
@@ -32,16 +28,16 @@ private:
     enum class State { Idle, Waiting, Streaming, Stopping };
 
     struct Layout {
-        size_t                        textLen = (size_t)-1;  // text length this layout was built for
+        size_t                        textLen = (size_t)-1;
         std::vector<gui::WrappedLine> lines;
-        std::vector<MdRun>            runs;    // style runs, in the same (marker-stripped) coordinates as lines
-        int                           textW  = 0;  // widest line in pixels
-        int                           height = 0;  // bubble height
-        int                           y      = 0;  // offset from the top of the content
+        std::vector<MdRun>            runs;
+        int                           textW  = 0;
+        int                           height = 0;
+        int                           y      = 0;
     };
 
     void drainPending();
-    bool flushPendingIntoMessages();  // returns true if a generation just finished; used by drainPending and ~ChatScreen
+    bool flushPendingIntoMessages();
     void relayout();
     bool askForText(std::string& out);
     void sendMessage(const std::string& text);
@@ -50,8 +46,8 @@ private:
     std::string statusText(u32& color) const;
 
     std::string   modelStem_;
-    uint32_t      chatId_ = 0;       // 0 = not yet saved
-    bool          dirty_  = false;   // true if messages_ changed since the last save
+    uint32_t      chatId_ = 0;
+    bool          dirty_  = false;
 
     std::unique_ptr<ChatBackend> backend_;
     std::vector<ChatMessage>     messages_;
@@ -60,9 +56,9 @@ private:
     State state_    = State::Idle;
     int   contentH_ = 0;
     int   scroll_   = 0;
-    bool  follow_   = true;  // keep the view glued to the newest text
+    bool  follow_   = true;
 
-    // Filled by backend callbacks (worker thread), drained by the UI thread.
+
     Mutex       mutex_;
     std::string pendingText_;
     int         pendingTokens_ = 0;

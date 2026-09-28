@@ -1,4 +1,4 @@
-// chat_store.cpp
+
 #include "chat_store.hpp"
 
 #include <dirent.h>
@@ -12,7 +12,7 @@ namespace chat_store {
 namespace {
 
 const char* const kRoot   = "sdmc:/switch/llm/chats";
-const uint32_t     kMagic  = 0x4B504C41;  // "ALPK" (byte order doesn't matter - never leaves this device)
+const uint32_t     kMagic  = 0x4B504C41;
 const uint32_t     kVersion = 1;
 const size_t        kMaxTitleBytes = 200;
 
@@ -31,7 +31,7 @@ void ensureDirs(const std::string& stem) {
     mkdir(dirFor(stem).c_str(), 0777);
 }
 
-// Reads-and-increments a small text counter file. Missing file -> starts at 1.
+
 uint32_t nextSeq(const std::string& stem) {
     const std::string path = counterFile(stem);
     uint32_t          n    = 1;
@@ -47,11 +47,11 @@ uint32_t nextSeq(const std::string& stem) {
     return n;
 }
 
-// Truncates to at most `maxBytes`, never splitting a UTF-8 sequence.
+
 std::string safeTruncate(const std::string& s, size_t maxBytes) {
     if (s.size() <= maxBytes) return s;
     size_t cut = maxBytes;
-    while (cut > 0 && (((unsigned char)s[cut]) & 0xC0) == 0x80) cut--;  // back up off a continuation byte
+    while (cut > 0 && (((unsigned char)s[cut]) & 0xC0) == 0x80) cut--;
     return s.substr(0, cut);
 }
 
@@ -78,13 +78,13 @@ bool writeString(FILE* f, const std::string& s) {
 bool readString(FILE* f, std::string& s, size_t capBytes) {
     uint32_t len = 0;
     if (!readU32(f, len)) return false;
-    if (len > capBytes) return false;  // corrupt/foreign file - refuse rather than allocate wildly
+    if (len > capBytes) return false;
     s.resize(len);
     if (len == 0) return true;
     return std::fread(&s[0], 1, len, f) == len;
 }
 
-}  // namespace
+}
 
 std::string modelStem(const std::string& name) {
     std::string out;
@@ -109,7 +109,7 @@ std::vector<ChatSummary> listChats(const std::string& stem) {
 
     while (dirent* e = readdir(d)) {
         std::string n = e->d_name;
-        if (n.size() < 10 || n.compare(0, 5, "chat_") != 0) continue;  // "chat_X.bin", X >= 1 digit
+        if (n.size() < 10 || n.compare(0, 5, "chat_") != 0) continue;
 
         FILE* f = std::fopen((dirFor(stem) + "/" + n).c_str(), "rb");
         if (!f) continue;
@@ -147,7 +147,7 @@ bool loadChat(const std::string& stem, uint32_t id, std::vector<ChatMessage>& ou
 
     outMessages.clear();
     outMessages.reserve(msgCount);
-    const size_t kMaxMessageBytes = 1u << 20;  // 1 MiB/message sanity cap against corrupt files
+    const size_t kMaxMessageBytes = 1u << 20;
     for (uint32_t i = 0; i < msgCount && ok; i++) {
         uint8_t roleByte = 0;
         ok               = std::fread(&roleByte, sizeof roleByte, 1, f) == 1;
@@ -165,8 +165,8 @@ uint32_t saveChat(const std::string& stem, uint32_t id, const std::string& title
     ensureDirs(stem);
     const uint32_t seq = nextSeq(stem);
     if (id == 0) {
-        // Chat ids and the recency counter share one sequence: fine, ids just
-        // won't be consecutive. Simpler than keeping two counter files in sync.
+
+
         id = seq;
     }
 
@@ -184,7 +184,7 @@ uint32_t saveChat(const std::string& stem, uint32_t id, const std::string& title
     }
     std::fclose(f);
     if (!ok) {
-        std::remove(fileFor(stem, id).c_str());  // don't leave a half-written file behind
+        std::remove(fileFor(stem, id).c_str());
         return 0;
     }
     return id;
@@ -192,4 +192,4 @@ uint32_t saveChat(const std::string& stem, uint32_t id, const std::string& title
 
 void deleteChat(const std::string& stem, uint32_t id) { std::remove(fileFor(stem, id).c_str()); }
 
-}  // namespace chat_store
+}
