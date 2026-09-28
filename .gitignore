@@ -1,6 +1,13 @@
 build/
-*.nro
 *.elf
+*.nro
 *.nacp
+*.nso
+*.npdm
+*.nsp
 *.map
-*.gguf
+dist/
+.vscode/
+.idea/
+*~
+.DS_Store
