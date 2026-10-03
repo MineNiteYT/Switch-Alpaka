@@ -18,7 +18,7 @@ INCLUDES    :=  include
 
 APP_TITLE   :=  Alpaka
 APP_AUTHOR  :=  MineNiteMii
-APP_VERSION :=  0.2
+APP_VERSION :=  0.5.0
 
 # Same llama.cpp checkout/build as switch-llm-console. Point this elsewhere if
 # your GUI project lives somewhere that shouldn't share it.
